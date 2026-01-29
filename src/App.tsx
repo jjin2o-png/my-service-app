@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
 /**
- * [버전 정보] v3.7 (사용자 커스텀 안정화 버전)
- * 1. 레이아웃 안정화: 가로 폭 흔들림 방지 및 중앙 정렬 강화
- * 2. 명칭 복구: '지원자명', '지원 내역 및 제품', '상세 내역' 등 사용자 선호 명칭 사용
- * 3. 기능: Firebase Real-time 연동, CSV 다운로드, 관리자 모드(PW: 20260331)
+ * [버전 정보] v3.7.2 (가로폭 & 시간 레이아웃 최적화)
+ * 1. 레이아웃: 전체 가로폭 360px 유지
+ * 2. 시간 선택기: 좁아진 폭에 맞춰 내부 패딩 및 버튼 크기 조정 (잘림 방지)
+ * 3. 기능 유지: Firebase Real-time, CSV 다운로드, 관리자 모드
  */
 
 const firebaseConfig = {
@@ -54,7 +54,6 @@ const App = () => {
     content: ''
   });
 
-  // 초기화: 로컬스토리지 정리 및 날짜 설정
   useEffect(() => {
     const currentToday = getTodayString();
     localStorage.removeItem(STORAGE_KEY);
@@ -69,7 +68,6 @@ const App = () => {
     setFilter(prev => ({ ...prev, endDate: currentToday }));
   }, []);
 
-  // Firebase 초기화
   useEffect(() => {
     const loadFirebase = async () => {
       try {
@@ -249,10 +247,10 @@ const App = () => {
     },
     card: { 
       width: '100%',
-      maxWidth: '450px', 
+      maxWidth: '360px', 
       backgroundColor: 'white', 
       borderRadius: '24px', 
-      padding: '20px', 
+      padding: '18px', 
       boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
       marginBottom: '20px',
       boxSizing: 'border-box'
@@ -262,11 +260,28 @@ const App = () => {
     input: { width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e5e7eb', boxSizing: 'border-box', fontSize: '14px' },
     textarea: { width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e5e7eb', boxSizing: 'border-box', fontSize: '14px', minHeight: '80px', marginTop: '10px' },
     button: (active, isPrimary) => ({
-      padding: '10px 15px', margin: '2px', border: '1px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', fontSize: '12px',
+      padding: '10px 12px', margin: '2px', border: '1px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', fontSize: '12px',
       fontWeight: 'bold', backgroundColor: active ? (isPrimary ? '#2563eb' : '#4f46e5') : 'white', color: active ? 'white' : '#4b5563',
     }),
     nav: { display: 'flex', gap: '5px', marginBottom: '15px' },
-    filterBox: { backgroundColor: '#f9fafb', padding: '15px', borderRadius: '15px', marginBottom: '15px', border: '1px solid #e5e7eb' }
+    filterBox: { backgroundColor: '#f9fafb', padding: '15px', borderRadius: '15px', marginBottom: '15px', border: '1px solid #e5e7eb' },
+    // 시간 선택기 카드 스타일 (폭 조절 됨)
+    timeControlCard: {
+      flex: 1, 
+      backgroundColor: '#1f2937', 
+      padding: '12px 5px', // 패딩 축소
+      borderRadius: '15px', 
+      color: 'white', 
+      textAlign: 'center'
+    },
+    timeControlBtn: {
+      background: 'none', 
+      border: 'none', 
+      color: 'white', 
+      fontSize: '18px',
+      width: '30px', // 버튼 고정폭 설정
+      cursor: 'pointer'
+    }
   };
 
   if (view === 'admin' && isAdminAuthenticated) {
@@ -287,7 +302,7 @@ const App = () => {
           </div>
           <button onClick={downloadCSV} style={{width: '100%', padding: '12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '10px', marginBottom: '15px', fontWeight: 'bold'}}>Excel(CSV) 다운로드</button>
           <div style={{maxHeight: '500px', overflowY: 'auto'}}>
-            {filteredLogs.length === 0 ? <p style={{textAlign: 'center', color: '#9ca3af', padding: '20px'}}>선택한 기간에 등록된 데이터가 없습니다.</p> : 
+            {filteredLogs.length === 0 ? <p style={{textAlign: 'center', color: '#9ca3af', padding: '20px'}}>선택한 기간에 데이터가 없습니다.</p> : 
               filteredLogs.map(log => {
                 const displayDate = log.createdAt?.toDate ? log.createdAt.toDate().toLocaleString('ko-KR', {month:'numeric', day:'numeric', hour:'numeric', minute:'numeric'}) : log.date;
                 return (
@@ -330,10 +345,10 @@ const App = () => {
             <h1 style={{margin: 0, fontSize: '20px', fontStyle: 'italic'}}>2026 서비스 조사</h1>
             <button onClick={handleAdminAccess} style={{fontSize: '10px', background: 'none', border: '1px solid #60a5fa', color: '#60a5fa', borderRadius: '5px', padding: '2px 5px'}}>ADMIN</button>
           </div>
-          <p style={{margin: 0, fontSize: '10px', color: '#60a5fa'}}>CLOUD SYNC v3.7</p>
+          <p style={{margin: 0, fontSize: '10px', color: '#60a5fa'}}>CLOUD SYNC v3.7.2</p>
         </div>
 
-        <div style={{display: 'flex', gap: '10px', marginBottom: '15px'}}>
+        <div style={{display: 'flex', gap: '8px', marginBottom: '15px'}}>
           <div style={{flex: 1}}><label style={styles.label}>지원자명</label><input type="text" style={styles.input} value={formData.authorId} onChange={e => setFormData({...formData, authorId: e.target.value})} placeholder="이름" /></div>
           <div style={{flex: 1}}><label style={styles.label}>지원일자</label><input type="date" style={styles.input} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
         </div>
@@ -345,19 +360,19 @@ const App = () => {
 
         <div style={{marginBottom: '20px'}}>
           <label style={styles.label}>지원 순번</label>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '14px 18px', borderRadius: '18px', border: '1px solid #f1f5f9'}}>
-            <span style={{fontSize: '22px', fontWeight: '900', color: '#2563eb'}}># {formData.supportOrder}</span>
-            <div style={{display: 'flex', gap: '10px'}}>
-              <button onClick={() => adjustValue('supportOrder', -1)} style={{...styles.button(false), width: '40px', flex: 'none', height: '40px', borderRadius: '50%', padding: 0, fontSize: '18px'}}>–</button>
-              <button onClick={() => adjustValue('supportOrder', 1)} style={{...styles.button(true, true), width: '40px', flex: 'none', height: '40px', borderRadius: '50%', padding: 0, fontSize: '18px'}}>+</button>
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '12px 15px', borderRadius: '18px', border: '1px solid #f1f5f9'}}>
+            <span style={{fontSize: '20px', fontWeight: '900', color: '#2563eb'}}># {formData.supportOrder}</span>
+            <div style={{display: 'flex', gap: '8px'}}>
+              <button onClick={() => adjustValue('supportOrder', -1)} style={{...styles.button(false), width: '36px', flex: 'none', height: '36px', borderRadius: '50%', padding: 0, fontSize: '16px'}}>–</button>
+              <button onClick={() => adjustValue('supportOrder', 1)} style={{...styles.button(true, true), width: '36px', flex: 'none', height: '36px', borderRadius: '50%', padding: 0, fontSize: '16px'}}>+</button>
             </div>
           </div>
         </div>
 
         <label style={styles.label}>지원 방법</label>
-        <div style={{display: 'flex', backgroundColor: '#f3f4f6', padding: '5px', borderRadius: '12px', marginBottom: '20px'}}>
+        <div style={{display: 'flex', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px', marginBottom: '20px'}}>
           {options.methods.map(m => (
-            <button key={m} type="button" onClick={() => setFormData({...formData, method: m})} style={{...styles.button(formData.method === m, true), flex: 1, border: 'none'}}>{m}</button>
+            <button key={m} type="button" onClick={() => setFormData({...formData, method: m})} style={{...styles.button(formData.method === m, true), flex: 1, border: 'none', fontSize: '11px', padding: '10px 5px'}}>{m}</button>
           ))}
         </div>
 
@@ -365,7 +380,7 @@ const App = () => {
           <label style={styles.label}>지원 유형(중복 선택 가능)</label>
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px'}}>
             {options.types.map(t => (
-              <button key={t} type="button" onClick={() => setFormData(p => ({...p, types: p.types.includes(t) ? p.types.filter(x => x !== t) : [...p.types, t]}))} style={{...styles.button(formData.types.includes(t), true), padding: '15px'}}>{t}</button>
+              <button key={t} type="button" onClick={() => setFormData(p => ({...p, types: p.types.includes(t) ? p.types.filter(x => x !== t) : [...p.types, t]}))} style={{...styles.button(formData.types.includes(t), true), padding: '12px 5px', fontSize: '11px'}}>{t}</button>
             ))}
           </div>
         </div>
@@ -374,9 +389,9 @@ const App = () => {
           <div style={{marginTop: '20px', borderTop: '2px solid #f3f4f6', paddingTop: '15px'}}>
             <label style={styles.label}>지원 내역 및 제품</label>
             {options.rows.filter(r => r.group === 'common' || formData.types.includes(r.group)).map(row => (
-              <div key={row.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6'}}>
-                <div style={{flex: 1}}><div style={{fontSize: '12px', fontWeight: 'bold', color: '#374151'}}>{row.label}</div></div>
-                <div style={{display: 'flex', gap: '3px'}}>{options.items.map(item => (<button key={item} type="button" onClick={() => toggleMatrix(item, row.label)} style={{...styles.button(formData.matrix[item].includes(row.label), true), padding: '6px 8px', fontSize: '10px'}}>{item}</button>))}</div>
+              <div key={row.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f3f4f6'}}>
+                <div style={{flex: 1}}><div style={{fontSize: '11px', fontWeight: 'bold', color: '#374151'}}>{row.label}</div></div>
+                <div style={{display: 'flex', gap: '2px'}}>{options.items.map(item => (<button key={item} type="button" onClick={() => toggleMatrix(item, row.label)} style={{...styles.button(formData.matrix[item].includes(row.label), true), padding: '5px 6px', fontSize: '9px'}}>{item}</button>))}</div>
               </div>
             ))}
           </div>
@@ -384,19 +399,21 @@ const App = () => {
 
         <div style={{marginTop: '20px'}}>
           <label style={styles.label}>지원 시간</label>
-          <div style={{display: 'flex', gap: '10px'}}>
-            <div style={{flex: 1, backgroundColor: '#1f2937', padding: '15px 10px', borderRadius: '15px', color: 'white', textAlign: 'center'}}>
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-                <button type="button" onClick={() => adjustValue('hours', -1)} style={{background: 'none', border: 'none', color: 'white', fontSize: '18px'}}>—</button>
-                <span style={{fontWeight: 'bold', fontSize: '16px', minWidth: '40px'}}>{formData.hours}시간</span>
-                <button type="button" onClick={() => adjustValue('hours', 1)} style={{background: 'none', border: 'none', color: 'white', fontSize: '18px'}}>+</button>
+          <div style={{display: 'flex', gap: '8px'}}>
+            {/* 시간 조절부 */}
+            <div style={styles.timeControlCard}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
+                <button type="button" onClick={() => adjustValue('hours', -1)} style={styles.timeControlBtn}>—</button>
+                <span style={{fontWeight: 'bold', fontSize: '14px', minWidth: '40px'}}>{formData.hours}시</span>
+                <button type="button" onClick={() => adjustValue('hours', 1)} style={styles.timeControlBtn}>+</button>
               </div>
             </div>
-            <div style={{flex: 1, backgroundColor: '#1f2937', padding: '15px 10px', borderRadius: '15px', color: 'white', textAlign: 'center'}}>
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-                <button type="button" onClick={() => adjustValue('minutes', -5)} style={{background: 'none', border: 'none', color: 'white', fontSize: '18px'}}>—</button>
-                <span style={{fontWeight: 'bold', fontSize: '16px', minWidth: '40px'}}>{formData.minutes}분</span>
-                <button type="button" onClick={() => adjustValue('minutes', 5)} style={{background: 'none', border: 'none', color: 'white', fontSize: '18px'}}>+</button>
+            {/* 분 조절부 */}
+            <div style={styles.timeControlCard}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
+                <button type="button" onClick={() => adjustValue('minutes', -5)} style={styles.timeControlBtn}>—</button>
+                <span style={{fontWeight: 'bold', fontSize: '14px', minWidth: '40px'}}>{formData.minutes}분</span>
+                <button type="button" onClick={() => adjustValue('minutes', 5)} style={styles.timeControlBtn}>+</button>
               </div>
             </div>
           </div>
@@ -407,7 +424,7 @@ const App = () => {
           <textarea style={styles.textarea} placeholder="특이사항이나 상세 지원 내역을 입력하세요..." value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
         </div>
 
-        <button onClick={handleSubmit} disabled={status === 'saving'} style={{width: '100%', padding: '18px', backgroundColor: status === 'saving' ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '18px', marginTop: '20px', fontWeight: 'bold', fontSize: '14px'}}>{status === 'saving' ? 'UPLOADING...' : '작성 완료'}</button>
+        <button onClick={handleSubmit} disabled={status === 'saving'} style={{width: '100%', padding: '16px', backgroundColor: status === 'saving' ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '18px', marginTop: '20px', fontWeight: 'bold', fontSize: '14px'}}>{status === 'saving' ? 'UPLOADING...' : '작성 완료'}</button>
       </div>
     </div>
   );
