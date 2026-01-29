@@ -190,7 +190,7 @@ const App = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.authorId) { alert('지원자명을 입력해주세요.'); return; }
+    if (!formData.authorId) { alert('담당자명을 입력해주세요.'); return; }
     if (!formData.customerName) { alert('고객명을 입력해주세요.'); return; }
     if (!db) { alert('데이터베이스 연결 중입니다.'); return; }
     
@@ -349,7 +349,7 @@ const App = () => {
         </div>
 
         <div style={{display: 'flex', gap: '8px', marginBottom: '15px'}}>
-          <div style={{flex: 1}}><label style={styles.label}>지원자명</label><input type="text" style={styles.input} value={formData.authorId} onChange={e => setFormData({...formData, authorId: e.target.value})} placeholder="이름" /></div>
+          <div style={{flex: 1}}><label style={styles.label}>담당자명</label><input type="text" style={styles.input} value={formData.authorId} onChange={e => setFormData({...formData, authorId: e.target.value})} placeholder="이름" /></div>
           <div style={{flex: 1}}><label style={styles.label}>지원일자</label><input type="date" style={styles.input} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
         </div>
 
