@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * [버전 정보] v3.8.4
- * 1. 수정: Firestore 'long-polling' 강제 설정 (gRPC 연결 오류 해결)
- * 2. 개선: 네트워크 제한이 엄격한 환경에서도 데이터 통신 안정성 확보
- * 3. 기능: 기존 UI 및 360px 레이아웃 유지
+ * [버전 정보] v3.8.5
+ * 1. 개선: 초기 로딩 화면 제거 (UI 즉시 렌더링)
+ * 2. 최적화: 백그라운드 Firestore 초기화로 체감 속도 향상
+ * 3. 유지: 기존 디자인, 360px 레이아웃, long-polling 안정성
  */
 
 const firebaseConfig = {
@@ -23,7 +23,7 @@ const App = () => {
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
   const [user, setUser] = useState(null);
-  const [status, setStatus] = useState('initializing');
+  const [status, setStatus] = useState('idle'); // 초기 상태를 idle로 변경하여 로딩 화면 제거
   const [logs, setLogs] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
@@ -57,9 +57,9 @@ const App = () => {
     content: ''
   });
 
-  // Firebase 초기화 및 네트워크 최적화 설정
+  // 백그라운드에서 조용히 Firebase 초기화
   useEffect(() => {
-    const loadFirebase = async () => {
+    const initFirebase = async () => {
       try {
         const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
         const { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
@@ -67,44 +67,30 @@ const App = () => {
         
         const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
         
-        // Firestore 연결 방식 개선 (Long-polling 강제 설정)
-        // 이 설정은 gRPC 차단 환경에서도 HTTP를 통해 데이터를 전달할 수 있게 합니다.
+        // 안정성은 유지하되 백그라운드에서 초기화
         const firestore = initializeFirestore(app, {
           localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-          experimentalForceLongPolling: true, // 핵심 수정 사항: 연결 안정성 향상
+          experimentalForceLongPolling: true,
           useFetchStreams: false
         });
         
         const firebaseAuth = getAuth(app);
-        
         setDb(firestore);
         setAuth(firebaseAuth);
 
-        try {
-          await signInAnonymously(firebaseAuth);
-        } catch (authError) {
-          console.warn("Auth Configuration Warning:", authError.message);
+        signInAnonymously(firebaseAuth).catch(() => {
           setUser({ uid: 'guest-' + Math.random().toString(36).substr(2, 9) });
-          setStatus('idle');
-          return;
-        }
+        });
         
         onAuthStateChanged(firebaseAuth, (u) => {
-          if (u) {
-            setUser(u);
-            setStatus('idle');
-          } else {
-            setUser({ uid: 'guest-session' });
-            setStatus('idle');
-          }
+          if (u) setUser(u);
         });
 
       } catch (error) {
-        console.error("Firebase 초기화 실패:", error);
-        setStatus('error');
+        console.error("Background Sync Init Failed:", error);
       }
     };
-    loadFirebase();
+    initFirebase();
   }, []);
 
   const options = {
@@ -138,8 +124,7 @@ const App = () => {
       setStatus('idle');
     } catch (error) {
       console.error("데이터 조회 실패:", error);
-      if (logs.length > 0) setStatus('idle');
-      else setStatus('error');
+      setStatus('idle');
     }
   };
 
@@ -244,7 +229,12 @@ const App = () => {
   const handleSubmit = async () => {
     if (!formData.authorId) { alert('담당자명을 입력해주세요.'); return; }
     if (!formData.customerName) { alert('고객명을 입력해주세요.'); return; }
-    if (!db) { alert('데이터베이스 연결 중입니다.'); return; }
+    
+    // DB 연결이 아직 안되었을 경우를 대비한 짧은 대기
+    if (!db) {
+        alert('서버 연결 중입니다. 잠시 후 다시 시도해주세요.');
+        return;
+    }
     
     setStatus('saving');
     try {
@@ -281,7 +271,7 @@ const App = () => {
     } catch (error) {
       console.error("전송 오류:", error);
       setStatus('idle');
-      alert('네트워크 연결이 지연되고 있습니다. 오프라인 모드로 저장되었으며 연결 즉시 동기화됩니다.');
+      alert('네트워크 연결이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
     }
   };
 
@@ -431,7 +421,7 @@ const App = () => {
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
             <div>
               <h1 style={{margin: 0, fontSize: '20px', fontStyle: 'italic'}}>{editingId ? '지원내역 수정' : '2026 서비스 조사'}</h1>
-              <p style={{margin: 0, fontSize: '10px', color: '#60a5fa'}}>CLOUD SYNC v3.8.4 {editingId && '· EDIT MODE'}</p>
+              <p style={{margin: 0, fontSize: '10px', color: '#60a5fa'}}>CLOUD SYNC v3.8.5 {editingId && '· EDIT MODE'}</p>
             </div>
             <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
               <button onClick={handleAdminAccess} style={styles.sideButton}>ADMIN</button>
@@ -440,95 +430,86 @@ const App = () => {
           </div>
         </div>
 
-        {status === 'initializing' ? (
-          <div style={{padding: '40px 0', textAlign: 'center', color: '#9ca3af'}}>
-            <p>서버와 연결을 시도하고 있습니다...</p>
-            <p style={{fontSize: '11px', marginTop: '10px'}}>보안 네트워크 환경에서 최적의 경로를 찾는 중입니다.</p>
+        <div style={{display: 'flex', gap: '8px', marginBottom: '15px'}}>
+          <div style={{flex: 1}}><label style={styles.label}>담당자명</label><input type="text" style={styles.input} value={formData.authorId} onChange={e => setFormData({...formData, authorId: e.target.value})} placeholder="이름" /></div>
+          <div style={{flex: 1}}><label style={styles.label}>지원일자</label><input type="date" style={styles.input} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+        </div>
+
+        <div style={{marginBottom: '15px'}}>
+          <label style={styles.label}>상호명/대표자</label>
+          <input type="text" style={styles.input} value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} placeholder="고객명 입력 *" />
+        </div>
+
+        <div style={{marginBottom: '20px'}}>
+          <label style={styles.label}>지원 순번</label>
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '12px 15px', borderRadius: '18px', border: '1px solid #f1f5f9'}}>
+            <span style={{fontSize: '20px', fontWeight: '900', color: '#2563eb'}}># {formData.supportOrder}</span>
+            <div style={{display: 'flex', gap: '8px'}}>
+              <button onClick={() => adjustValue('supportOrder', -1)} style={{...styles.button(false), width: '36px', flex: 'none', height: '36px', borderRadius: '50%', padding: 0, fontSize: '16px'}}>–</button>
+              <button onClick={() => adjustValue('supportOrder', 1)} style={{...styles.button(true, true), width: '36px', flex: 'none', height: '36px', borderRadius: '50%', padding: 0, fontSize: '16px'}}>+</button>
+            </div>
           </div>
-        ) : (
-          <>
-            <div style={{display: 'flex', gap: '8px', marginBottom: '15px'}}>
-              <div style={{flex: 1}}><label style={styles.label}>담당자명</label><input type="text" style={styles.input} value={formData.authorId} onChange={e => setFormData({...formData, authorId: e.target.value})} placeholder="이름" /></div>
-              <div style={{flex: 1}}><label style={styles.label}>지원일자</label><input type="date" style={styles.input} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-            </div>
+        </div>
 
-            <div style={{marginBottom: '15px'}}>
-              <label style={styles.label}>상호명/대표자</label>
-              <input type="text" style={styles.input} value={formData.customerName} onChange={e => setFormData({...formData, customerName: e.target.value})} placeholder="고객명 입력 *" />
-            </div>
+        <label style={styles.label}>지원 방법</label>
+        <div style={{display: 'flex', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px', marginBottom: '20px'}}>
+          {options.methods.map(m => (
+            <button key={m} type="button" onClick={() => setFormData({...formData, method: m})} style={{...styles.button(formData.method === m, true), flex: 1, border: 'none', fontSize: '11px', padding: '10px 5px'}}>{m}</button>
+          ))}
+        </div>
 
-            <div style={{marginBottom: '20px'}}>
-              <label style={styles.label}>지원 순번</label>
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '12px 15px', borderRadius: '18px', border: '1px solid #f1f5f9'}}>
-                <span style={{fontSize: '20px', fontWeight: '900', color: '#2563eb'}}># {formData.supportOrder}</span>
-                <div style={{display: 'flex', gap: '8px'}}>
-                  <button onClick={() => adjustValue('supportOrder', -1)} style={{...styles.button(false), width: '36px', flex: 'none', height: '36px', borderRadius: '50%', padding: 0, fontSize: '16px'}}>–</button>
-                  <button onClick={() => adjustValue('supportOrder', 1)} style={{...styles.button(true, true), width: '36px', flex: 'none', height: '36px', borderRadius: '50%', padding: 0, fontSize: '16px'}}>+</button>
-                </div>
+        <div style={{marginBottom: '15px'}}>
+          <label style={styles.label}>지원 유형(중복 선택 가능)</label>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px'}}>
+            {options.types.map(t => (
+              <button key={t} type="button" onClick={() => setFormData(p => ({...p, types: p.types.includes(t) ? p.types.filter(x => x !== t) : [...p.types, t]}))} style={{...styles.button(formData.types.includes(t), true), padding: '12px 5px', fontSize: '11px'}}>{t}</button>
+            ))}
+          </div>
+        </div>
+
+        {formData.types.length > 0 && (
+          <div style={{marginTop: '20px', borderTop: '2px solid #f3f4f6', paddingTop: '15px'}}>
+            <label style={styles.label}>지원 내역 및 제품</label>
+            {options.rows.filter(r => r.group === 'common' || formData.types.includes(r.group)).map(row => (
+              <div key={row.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f3f4f6'}}>
+                <div style={{flex: 1}}><div style={{fontSize: '11px', fontWeight: 'bold', color: '#374151'}}>{row.label}</div></div>
+                <div style={{display: 'flex', gap: '2px'}}>{options.items.map(item => (<button key={item} type="button" onClick={() => toggleMatrix(item, row.label)} style={{...styles.button(formData.matrix[item].includes(row.label), true), padding: '5px 6px', fontSize: '9px'}}>{item}</button>))}</div>
               </div>
-            </div>
-
-            <label style={styles.label}>지원 방법</label>
-            <div style={{display: 'flex', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px', marginBottom: '20px'}}>
-              {options.methods.map(m => (
-                <button key={m} type="button" onClick={() => setFormData({...formData, method: m})} style={{...styles.button(formData.method === m, true), flex: 1, border: 'none', fontSize: '11px', padding: '10px 5px'}}>{m}</button>
-              ))}
-            </div>
-
-            <div style={{marginBottom: '15px'}}>
-              <label style={styles.label}>지원 유형(중복 선택 가능)</label>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px'}}>
-                {options.types.map(t => (
-                  <button key={t} type="button" onClick={() => setFormData(p => ({...p, types: p.types.includes(t) ? p.types.filter(x => x !== t) : [...p.types, t]}))} style={{...styles.button(formData.types.includes(t), true), padding: '12px 5px', fontSize: '11px'}}>{t}</button>
-                ))}
-              </div>
-            </div>
-
-            {formData.types.length > 0 && (
-              <div style={{marginTop: '20px', borderTop: '2px solid #f3f4f6', paddingTop: '15px'}}>
-                <label style={styles.label}>지원 내역 및 제품</label>
-                {options.rows.filter(r => r.group === 'common' || formData.types.includes(r.group)).map(row => (
-                  <div key={row.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f3f4f6'}}>
-                    <div style={{flex: 1}}><div style={{fontSize: '11px', fontWeight: 'bold', color: '#374151'}}>{row.label}</div></div>
-                    <div style={{display: 'flex', gap: '2px'}}>{options.items.map(item => (<button key={item} type="button" onClick={() => toggleMatrix(item, row.label)} style={{...styles.button(formData.matrix[item].includes(row.label), true), padding: '5px 6px', fontSize: '9px'}}>{item}</button>))}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{marginTop: '20px'}}>
-              <label style={styles.label}>지원 시간</label>
-              <div style={{display: 'flex', gap: '8px'}}>
-                <div style={styles.timeControlCard}>
-                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
-                    <button type="button" onClick={() => adjustValue('hours', -1)} style={styles.timeControlBtn}>—</button>
-                    <span style={{fontWeight: 'bold', fontSize: '14px', minWidth: '40px'}}>{formData.hours}시</span>
-                    <button type="button" onClick={() => adjustValue('hours', 1)} style={styles.timeControlBtn}>+</button>
-                  </div>
-                </div>
-                <div style={styles.timeControlCard}>
-                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
-                    <button type="button" onClick={() => adjustValue('minutes', -5)} style={styles.timeControlBtn}>—</button>
-                    <span style={{fontWeight: 'bold', fontSize: '14px', minWidth: '40px'}}>{formData.minutes}분</span>
-                    <button type="button" onClick={() => adjustValue('minutes', 5)} style={styles.timeControlBtn}>+</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{marginTop: '20px'}}>
-              <label style={styles.label}>상세 내역</label>
-              <textarea style={styles.textarea} placeholder="특이사항이나 상세 지원 내역을 입력하세요..." value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
-            </div>
-
-            <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
-              {editingId && (
-                <button onClick={() => { setEditingId(null); setView('userLogs'); }} style={{flex: 1, padding: '16px', backgroundColor: '#f3f4f6', color: '#4b5563', border: '1px solid #e5e7eb', borderRadius: '18px', fontWeight: 'bold', fontSize: '14px'}}>취소</button>
-              )}
-              <button onClick={handleSubmit} disabled={status === 'saving'} style={{flex: 2, padding: '16px', backgroundColor: status === 'saving' ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '18px', fontWeight: 'bold', fontSize: '14px'}}>{status === 'saving' ? '저장 중...' : (editingId ? '수정 완료' : '작성 완료')}</button>
-            </div>
-          </>
+            ))}
+          </div>
         )}
+
+        <div style={{marginTop: '20px'}}>
+          <label style={styles.label}>지원 시간</label>
+          <div style={{display: 'flex', gap: '8px'}}>
+            <div style={styles.timeControlCard}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
+                <button type="button" onClick={() => adjustValue('hours', -1)} style={styles.timeControlBtn}>—</button>
+                <span style={{fontWeight: 'bold', fontSize: '14px', minWidth: '40px'}}>{formData.hours}시</span>
+                <button type="button" onClick={() => adjustValue('hours', 1)} style={styles.timeControlBtn}>+</button>
+              </div>
+            </div>
+            <div style={styles.timeControlCard}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
+                <button type="button" onClick={() => adjustValue('minutes', -5)} style={styles.timeControlBtn}>—</button>
+                <span style={{fontWeight: 'bold', fontSize: '14px', minWidth: '40px'}}>{formData.minutes}분</span>
+                <button type="button" onClick={() => adjustValue('minutes', 5)} style={styles.timeControlBtn}>+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{marginTop: '20px'}}>
+          <label style={styles.label}>상세 내역</label>
+          <textarea style={styles.textarea} placeholder="특이사항이나 상세 지원 내역을 입력하세요..." value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
+        </div>
+
+        <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
+          {editingId && (
+            <button onClick={() => { setEditingId(null); setView('userLogs'); }} style={{flex: 1, padding: '16px', backgroundColor: '#f3f4f6', color: '#4b5563', border: '1px solid #e5e7eb', borderRadius: '18px', fontWeight: 'bold', fontSize: '14px'}}>취소</button>
+          )}
+          <button onClick={handleSubmit} disabled={status === 'saving'} style={{flex: 2, padding: '16px', backgroundColor: status === 'saving' ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '18px', fontWeight: 'bold', fontSize: '14px'}}>{status === 'saving' ? '저장 중...' : (editingId ? '수정 완료' : '작성 완료')}</button>
+        </div>
       </div>
     </div>
   );
