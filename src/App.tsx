@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * [버전 정보] v3.8.5
+ * [버전 정보] v3.8.6
  * 1. 개선: 초기 로딩 화면 제거 (UI 즉시 렌더링)
  * 2. 최적화: 백그라운드 Firestore 초기화로 체감 속도 향상
  * 3. 유지: 기존 디자인, 360px 레이아웃, long-polling 안정성
+ * 4. 키 교체
  */
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCQVfwjkQ7IMZdPkXSoeOiL9GGfTrI7bgI",
+  apiKey: "AIzaSyB6-LBX-dYltkkWI4-BRFPXPWNULnaAeP4",
   authDomain: "rdb1-c8163.firebaseapp.com",
   projectId: "rdb1-c8163",
   storageBucket: "rdb1-c8163.firebasestorage.app",
